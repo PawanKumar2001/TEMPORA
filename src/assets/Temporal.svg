@@ -1,0 +1,25 @@
+<svg width="48" height="48" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <circle cx="50" cy="50" r="48" fill="#0b0b0b"/>
+
+  <!-- Sun -->
+  <circle cx="65" cy="35" r="10" fill="#FFB300"/>
+
+  <!-- Temperature wave -->
+  <path d="M20 60 
+           C30 45, 40 75, 50 60 
+           C60 45, 70 75, 80 60"
+        stroke="#FFB300"
+        stroke-width="3"
+        fill="none"
+        stroke-linecap="round"/>
+
+  <!-- Minimal thermometer line -->
+  <line x1="35" y1="30" x2="35" y2="65"
+        stroke="#FFB300"
+        stroke-width="3"
+        stroke-linecap="round"/>
+
+  <!-- Thermometer bulb -->
+  <circle cx="35" cy="70" r="5" fill="#FFB300"/>
+</svg>
