@@ -45,6 +45,28 @@ html, body {
 }
 
 /* ── Date picker icon ── */
+/* Range slider thumb — used by chart zoom selectors */
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  pointer-events: all;
+  cursor: ew-resize;
+  border: 2px solid var(--bg);
+  box-shadow: 0 0 4px var(--accent-dim);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  pointer-events: all;
+  cursor: ew-resize;
+  border: 2px solid var(--bg);
+}
 input[type="date"]::-webkit-calendar-picker-indicator {
   filter: invert(1) opacity(0.4);
   cursor: pointer;

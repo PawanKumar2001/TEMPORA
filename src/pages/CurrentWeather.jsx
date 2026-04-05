@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback } from "react";
 import { useGeolocation } from "../hooks/useGeolocation";
 import { useWeather } from "../hooks/useWeather";
 import { useLocationName } from "../hooks/useLocationName";
+import { useTheme } from "../context/ThemeContext";
 import StatCard from "../components/StatCard";
 import { HourlyAreaChart, HourlyBarChart, PMChart } from "../components/HourlyChart";
 import { SkeletonCard, SkeletonChart } from "../components/Skeleton";
@@ -120,6 +121,9 @@ export default function CurrentWeather() {
   );
 
   const tempUnit = isCelsius ? "°C" : "°F";
+  const { themeKey, themes } = useTheme();
+  const accent  = themes[themeKey]?.vars["--accent"]  || "#22d3ee";
+  const accent2 = themes[themeKey]?.vars["--accent2"] || "#38bdf8";
   const { label: aqiLbl, color: aqiColor } = aqiLabel(currentAQ.aqi);
 
   if (gpsLoading && !location) {
@@ -298,11 +302,11 @@ export default function CurrentWeather() {
             Array(6).fill(0).map((_, i) => <SkeletonChart key={i} />)
           ) : (
             <>
-              <HourlyAreaChart title={`Temperature (${tempUnit})`} data={hourlyData} dataKey={isCelsius ? "tempC" : "tempF"} color="var(--accent)"  unit={tempUnit} />
-              <HourlyAreaChart title="Relative Humidity (%)"        data={hourlyData} dataKey="humidity"                                               color="var(--accent2)" unit="%" />
-              <HourlyBarChart  title="Precipitation (mm)"           data={hourlyData} dataKey="precipitation"                                          color="var(--accent)"  unit="mm" />
-              <HourlyAreaChart title="Visibility (km)"              data={hourlyData} dataKey="visibility"                                             color="var(--accent2)" unit="km" />
-              <HourlyAreaChart title="Wind Speed 10m (km/h)"        data={hourlyData} dataKey="windSpeed"                                              color="var(--accent)"  unit="km/h" />
+              <HourlyAreaChart title={`Temperature (${tempUnit})`} data={hourlyData} dataKey={isCelsius ? "tempC" : "tempF"} color={accent}  unit={tempUnit} />
+              <HourlyAreaChart title="Relative Humidity (%)"        data={hourlyData} dataKey="humidity"                                              color={accent2} unit="%" />
+              <HourlyBarChart  title="Precipitation (mm)"           data={hourlyData} dataKey="precipitation"                                         color={accent}  unit="mm" />
+              <HourlyAreaChart title="Visibility (km)"              data={hourlyData} dataKey="visibility"                                            color={accent2} unit="km" />
+              <HourlyAreaChart title="Wind Speed 10m (km/h)"        data={hourlyData} dataKey="windSpeed"                                             color={accent}  unit="km/h" />
               <PMChart data={hourlyData} />
             </>
           )}

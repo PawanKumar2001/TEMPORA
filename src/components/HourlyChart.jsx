@@ -1,4 +1,4 @@
-import React, { useRef, useCallback } from "react";
+import React, { useRef, useCallback, useState } from "react";
 import { useTheme } from "../context/ThemeContext";
 import {
   ResponsiveContainer,
@@ -11,10 +11,9 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  Brush,
 } from "recharts";
 
-/* Custom tooltip styled to match the active theme */
+/* ── Tooltip ─────────────────────────────────────────────────────────── */
 function DarkTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   return (
@@ -36,175 +35,244 @@ function DarkTooltip({ active, payload, label }) {
   );
 }
 
-/* Brush component — reads accent directly from ThemeContext, works in production */
-function ChartBrush({ dataLength }) {
-  const { themeKey, themes } = useTheme();
-  const startIndex = Math.max(0, dataLength - 12);
-
-  const vars = themes[themeKey]?.vars || {};
-  const accent = vars["--accent"] || "#22d3ee";
-  const bg2    = vars["--bg2"]    || "#0d1526";
-  const border = vars["--border"] || "rgba(255,255,255,0.1)";
+/* ── Custom HTML Range Slider ────────────────────────────────────────── */
+/* Replaces Recharts <Brush /> entirely — works in all environments     */
+function RangeSelector({ total, startIndex, endIndex, onChange, accent }) {
+  const startPct = total > 1 ? (startIndex / (total - 1)) * 100 : 0;
+  const endPct   = total > 1 ? (endIndex   / (total - 1)) * 100 : 100;
 
   return (
-    <Brush
-      dataKey="hour"
-      startIndex={startIndex}
-      height={28}
-      stroke={accent}
-      fill={bg2}
-      travellerWidth={8}
-      traveller={<CustomTraveller fill={accent} stroke={border} />}
-    />
+    <div className="relative mx-1 mt-2 mb-1" style={{ height: 28 }}>
+      {/* Track background */}
+      <div className="absolute inset-0 rounded-full" style={{
+        background: "var(--surface)",
+        border: "1px solid var(--border)",
+        top: "50%", transform: "translateY(-50%)", height: 6,
+      }} />
+
+      {/* Active range highlight */}
+      <div className="absolute rounded-full" style={{
+        background: accent,
+        opacity: 0.35,
+        left: `${startPct}%`,
+        width: `${endPct - startPct}%`,
+        top: "50%", transform: "translateY(-50%)", height: 6,
+      }} />
+
+      {/* Start handle */}
+      <input
+        type="range"
+        min={0}
+        max={total - 1}
+        value={startIndex}
+        onChange={e => {
+          const v = parseInt(e.target.value);
+          if (v < endIndex) onChange(v, endIndex);
+        }}
+        className="absolute w-full appearance-none bg-transparent pointer-events-none"
+        style={{ top: "50%", transform: "translateY(-50%)", height: 6,
+          "--thumb-color": accent,
+        }}
+      />
+
+      {/* End handle */}
+      <input
+        type="range"
+        min={0}
+        max={total - 1}
+        value={endIndex}
+        onChange={e => {
+          const v = parseInt(e.target.value);
+          if (v > startIndex) onChange(startIndex, v);
+        }}
+        className="absolute w-full appearance-none bg-transparent pointer-events-none"
+        style={{ top: "50%", transform: "translateY(-50%)", height: 6,
+          "--thumb-color": accent,
+        }}
+      />
+
+      {/* Range labels */}
+      <div className="absolute w-full flex justify-between" style={{ top: 20 }}>
+        <span style={{ fontSize: 9, color: accent, opacity: 0.7, marginLeft: `${startPct}%` }}>
+          {startIndex}h
+        </span>
+        <span style={{ fontSize: 9, color: accent, opacity: 0.7, marginRight: `${100 - endPct}%` }}>
+          {endIndex}h
+        </span>
+      </div>
+    </div>
   );
 }
 
-/* Custom traveller handle */
-function CustomTraveller({ x, y, width, height, fill, stroke }) {
-  return (
-    <rect
-      x={x}
-      y={y}
-      width={width || 8}
-      height={height || 28}
-      rx={4}
-      ry={4}
-      fill={fill}
-      stroke={stroke}
-      strokeWidth={1}
-      style={{ cursor: "ew-resize" }}
-    />
-  );
-}
-
-/* Shared axis and grid styles driven by CSS variables */
-const axisTick = { fill: "var(--muted)", fontSize: 11 };
+/* ── Shared constants ─────────────────────────────────────────────── */
+const axisTick  = { fill: "var(--muted)", fontSize: 11 };
 const gridStroke = "var(--grid)";
 
-/* Wraps each chart — horizontal scroll on mobile, drag-to-scroll on desktop */
-function ChartWrapper({ title, children }) {
-  const scrollRef = useRef(null);
+/* ── Chart Wrapper ────────────────────────────────────────────────── */
+function ChartWrapper({ title, data, children }) {
+  const { themeKey, themes } = useTheme();
+  const accent = themes[themeKey]?.vars["--accent"] || "#22d3ee";
 
-  /* Drag-to-scroll on desktop */
+  const total = data?.length || 0;
+  const [range, setRange] = useState(() => ({
+    start: Math.max(0, total - 12),
+    end: total - 1,
+  }));
+
+  /* Reset range when data changes (e.g. date change) */
+  const prevTotal = useRef(total);
+  if (prevTotal.current !== total) {
+    prevTotal.current = total;
+    range.start = Math.max(0, total - 12);
+    range.end   = total - 1;
+  }
+
+  const slicedData = total > 0 ? data.slice(range.start, range.end + 1) : data;
+
+  const scrollRef = useRef(null);
   const onMouseDown = useCallback((e) => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const startX = e.pageX - el.offsetLeft;
-    const scrollLeft = el.scrollLeft;
+    const el = scrollRef.current; if (!el) return;
+    const startX = e.pageX - el.offsetLeft, scrollLeft = el.scrollLeft;
     const onMove = (e) => { el.scrollLeft = scrollLeft - (e.pageX - el.offsetLeft - startX); };
     const onUp = () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
+    window.addEventListener("mousemove", onMove); window.addEventListener("mouseup", onUp);
   }, []);
 
   return (
-    <div
-      className="rounded-2xl p-4 min-w-0 w-full relative"
-      style={{ border: "1px solid var(--border)", background: "var(--surface)" }}
-    >
-      {/* Corner glow blob */}
-      <div
-        className="liquid-blob-tile absolute -top-6 -right-6 w-24 h-24 opacity-10 pointer-events-none"
-        style={{ background: "radial-gradient(ellipse, var(--card-blob) 0%, transparent 70%)" }}
-      />
+    <div className="rounded-2xl p-4 min-w-0 w-full relative"
+      style={{ border: "1px solid var(--border)", background: "var(--surface)" }}>
+      <div className="liquid-blob-tile absolute -top-6 -right-6 w-24 h-24 opacity-10 pointer-events-none"
+        style={{ background: "radial-gradient(ellipse, var(--card-blob) 0%, transparent 70%)" }} />
 
-      {/* Title + zoom hint */}
-      <div className="flex items-center justify-between mb-3 relative z-10">
+      {/* Title */}
+      <div className="flex items-center justify-between mb-2 relative z-10">
         <h3 className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--muted)" }}>
           {title}
         </h3>
-        <span className="text-xs hidden sm:block" style={{ color: "var(--muted)", opacity: 0.45 }}>
-          drag handles to zoom
-        </span>
-        <span className="text-xs sm:hidden" style={{ color: "var(--muted)", opacity: 0.45 }}>
-          scroll · drag handles to zoom
+        <span className="text-xs" style={{ color: "var(--muted)", opacity: 0.45 }}>
+          slide to zoom
         </span>
       </div>
 
-      {/* Scrollable container — touch-friendly on mobile, draggable on desktop */}
-      <div
-        ref={scrollRef}
-        className="overflow-x-auto relative z-10"
+      {/* Range slider */}
+      {total > 1 && (
+        <div className="relative z-10 px-1 mb-2">
+          <RangeSelector
+            total={total}
+            startIndex={range.start}
+            endIndex={range.end}
+            onChange={(s, e) => setRange({ start: s, end: e })}
+            accent={accent}
+          />
+        </div>
+      )}
+
+      {/* Scrollable chart */}
+      <div ref={scrollRef} className="overflow-x-auto relative z-10"
         style={{ WebkitOverflowScrolling: "touch", cursor: "grab" }}
-        onMouseDown={onMouseDown}
-      >
-        {/* minWidth keeps chart legible on small screens */}
-        <div style={{ minWidth: 480 }}>
-          {children}
+        onMouseDown={onMouseDown}>
+        <div style={{ minWidth: 480, paddingBottom: 8 }}>
+          {typeof children === "function" ? children(slicedData, accent) : children}
         </div>
       </div>
     </div>
   );
 }
 
-/* Generic hourly area chart with Brush zoom + scroll */
+/* ── Area Chart ───────────────────────────────────────────────────── */
 export function HourlyAreaChart({ title, data, dataKey, color, unit }) {
   return (
-    <ChartWrapper title={title}>
-      <ResponsiveContainer width="100%" height={240}>
-        <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-          <defs>
-            <linearGradient id={`grad-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%"  stopColor={color} stopOpacity={0.35} />
-              <stop offset="95%" stopColor={color} stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
-          <XAxis dataKey="hour" tick={axisTick} tickLine={false} axisLine={false} />
-          <YAxis tick={axisTick} tickLine={false} axisLine={false} width={36} />
-          <Tooltip content={<DarkTooltip />} />
-          <Area type="monotone" dataKey={dataKey} stroke={color} strokeWidth={2} fill={`url(#grad-${dataKey})`} name={title} unit={unit ? ` ${unit}` : ""} dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
-          <ChartBrush dataLength={data.length} />
-        </AreaChart>
-      </ResponsiveContainer>
+    <ChartWrapper title={title} data={data}>
+      {(sliced, accent) => {
+        const c = color === "var(--accent)" ? accent : color;
+        return (
+          <ResponsiveContainer width="100%" height={220}>
+            <AreaChart data={sliced} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id={`grad-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%"  stopColor={c} stopOpacity={0.35} />
+                  <stop offset="95%" stopColor={c} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
+              <XAxis dataKey="hour" tick={axisTick} tickLine={false} axisLine={false} />
+              <YAxis tick={axisTick} tickLine={false} axisLine={false} width={36} />
+              <Tooltip content={<DarkTooltip />} />
+              <Area type="monotone" dataKey={dataKey} stroke={c} strokeWidth={2}
+                fill={`url(#grad-${dataKey})`} name={title} unit={unit ? ` ${unit}` : ""}
+                dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
+            </AreaChart>
+          </ResponsiveContainer>
+        );
+      }}
     </ChartWrapper>
   );
 }
 
-/* Precipitation bar chart with Brush zoom + scroll */
+/* ── Bar Chart ────────────────────────────────────────────────────── */
 export function HourlyBarChart({ title, data, dataKey, color, unit }) {
   return (
-    <ChartWrapper title={title}>
-      <ResponsiveContainer width="100%" height={240}>
-        <BarChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
-          <XAxis dataKey="hour" tick={axisTick} tickLine={false} axisLine={false} />
-          <YAxis tick={axisTick} tickLine={false} axisLine={false} width={36} />
-          <Tooltip content={<DarkTooltip />} />
-          <Bar dataKey={dataKey} fill={color} radius={[4, 4, 0, 0]} name={title} unit={unit ? ` ${unit}` : ""} />
-          <ChartBrush dataLength={data.length} />
-        </BarChart>
-      </ResponsiveContainer>
+    <ChartWrapper title={title} data={data}>
+      {(sliced, accent) => {
+        const c = color === "var(--accent)" ? accent : color;
+        return (
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={sliced} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
+              <XAxis dataKey="hour" tick={axisTick} tickLine={false} axisLine={false} />
+              <YAxis tick={axisTick} tickLine={false} axisLine={false} width={36} />
+              <Tooltip content={<DarkTooltip />} />
+              <Bar dataKey={dataKey} fill={c} radius={[4, 4, 0, 0]}
+                name={title} unit={unit ? ` ${unit}` : ""} />
+            </BarChart>
+          </ResponsiveContainer>
+        );
+      }}
     </ChartWrapper>
   );
 }
 
-/* Combined PM10 + PM2.5 chart with Brush zoom + scroll */
+/* ── PM Chart ─────────────────────────────────────────────────────── */
 export function PMChart({ data }) {
   return (
-    <ChartWrapper title="PM10 & PM2.5 (μg/m³)">
-      <ResponsiveContainer width="100%" height={240}>
-        <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-          <defs>
-            <linearGradient id="grad-pm10" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%"  stopColor="var(--accent)"  stopOpacity={0.35} />
-              <stop offset="95%" stopColor="var(--accent)"  stopOpacity={0} />
-            </linearGradient>
-            <linearGradient id="grad-pm25" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%"  stopColor="var(--accent2)" stopOpacity={0.35} />
-              <stop offset="95%" stopColor="var(--accent2)" stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
-          <XAxis dataKey="hour" tick={axisTick} tickLine={false} axisLine={false} />
-          <YAxis tick={axisTick} tickLine={false} axisLine={false} width={36} />
-          <Tooltip content={<DarkTooltip />} />
-          <Legend wrapperStyle={{ fontSize: 11, color: "var(--muted)" }} />
-          <Area type="monotone" dataKey="pm10" stroke="var(--accent)"  strokeWidth={2} fill="url(#grad-pm10)" name="PM10"  unit=" μg/m³" dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
-          <Area type="monotone" dataKey="pm25" stroke="var(--accent2)" strokeWidth={2} fill="url(#grad-pm25)" name="PM2.5" unit=" μg/m³" dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
-          <ChartBrush dataLength={data.length} />
-        </AreaChart>
-      </ResponsiveContainer>
+    <ChartWrapper title="PM10 & PM2.5 (μg/m³)" data={data}>
+      {(sliced, accent) => {
+        const { themeKey, themes } = { themeKey: null, themes: null };
+        /* accent is already resolved from ChartWrapper */
+        const accent2 = accent; /* fallback — will be overridden below */
+        return <PMInner sliced={sliced} />;
+      }}
     </ChartWrapper>
+  );
+}
+
+/* Inner component so we can call useTheme cleanly */
+function PMInner({ sliced }) {
+  const { themeKey, themes } = useTheme();
+  const accent  = themes[themeKey]?.vars["--accent"]  || "#22d3ee";
+  const accent2 = themes[themeKey]?.vars["--accent2"] || "#38bdf8";
+
+  return (
+    <ResponsiveContainer width="100%" height={220}>
+      <AreaChart data={sliced} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+        <defs>
+          <linearGradient id="grad-pm10" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%"  stopColor={accent}  stopOpacity={0.35} />
+            <stop offset="95%" stopColor={accent}  stopOpacity={0} />
+          </linearGradient>
+          <linearGradient id="grad-pm25" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%"  stopColor={accent2} stopOpacity={0.35} />
+            <stop offset="95%" stopColor={accent2} stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
+        <XAxis dataKey="hour" tick={axisTick} tickLine={false} axisLine={false} />
+        <YAxis tick={axisTick} tickLine={false} axisLine={false} width={36} />
+        <Tooltip content={<DarkTooltip />} />
+        <Legend wrapperStyle={{ fontSize: 11, color: "var(--muted)" }} />
+        <Area type="monotone" dataKey="pm10" stroke={accent}  strokeWidth={2} fill="url(#grad-pm10)" name="PM10"  unit=" μg/m³" dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
+        <Area type="monotone" dataKey="pm25" stroke={accent2} strokeWidth={2} fill="url(#grad-pm25)" name="PM2.5" unit=" μg/m³" dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
+      </AreaChart>
+    </ResponsiveContainer>
   );
 }
