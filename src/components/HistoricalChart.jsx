@@ -1,4 +1,5 @@
 import React, { useRef, useCallback } from "react";
+import { useTheme } from "../context/ThemeContext";
 import {
   ResponsiveContainer,
   LineChart,
@@ -51,49 +52,48 @@ function HistTooltip({ active, payload, label }) {
 
 /* ── Brush ─────────────────────────────────────────────────────────────── */
 
-/* Brush defaults to showing last 90 days; drag handles to zoom.
-   Reads CSS vars via getComputedStyle so SVG attrs resolve correctly in production. */
+/* Brush defaults to showing last 90 days — reads from ThemeContext for production safety */
 function HistBrush({ dataLength }) {
+  const { themeKey, themes } = useTheme();
   const startIndex = Math.max(0, dataLength - 90);
 
-  const style = typeof window !== "undefined"
-    ? getComputedStyle(document.documentElement)
-    : null;
-
-  const borderColor = style?.getPropertyValue("--border").trim() || "rgba(255,255,255,0.1)";
-  const bgColor     = style?.getPropertyValue("--bg2").trim()    || "#0d1526";
-  const accentColor = style?.getPropertyValue("--accent").trim() || "#22d3ee";
+  const vars   = themes[themeKey]?.vars || {};
+  const accent = vars["--accent"] || "#22d3ee";
+  const bg2    = vars["--bg2"]    || "#0d1526";
+  const border = vars["--border"] || "rgba(255,255,255,0.1)";
 
   return (
     <Brush
-    dataKey="date"
-    startIndex={startIndex}
-    height={22}
-    stroke={accentColor}
-    fill={bgColor}
-    travellerWidth={7}
-    traveller={<HistTraveller fill={accentColor} />}
-  />
+      dataKey="date"
+      startIndex={startIndex}
+      height={26}
+      stroke={accent}
+      fill={bg2}
+      travellerWidth={7}
+      traveller={<HistTraveller fill={accent} stroke={border} />}
+    />
   );
 }
 
 /* Custom traveller handle for HistBrush */
-function HistTraveller({ x, y, width, height, fill }) {
+function HistTraveller({ x, y, width, height, fill, stroke }) {
   return (
     <rect
       x={x}
       y={y}
       width={width || 7}
-      height={height || 22}
+      height={height || 26}
       rx={3}
       ry={3}
       fill={fill}
+      stroke={stroke}
+      strokeWidth={1}
       style={{ cursor: "ew-resize" }}
     />
   );
 }
 
-/* Chart Wrapper */
+/* ── Chart Wrapper ─────────────────────────────────────────────────────── */
 
 /* Horizontal-scroll + drag-to-scroll wrapper shared by all historical charts */
 function HistChartWrapper({ title, subtitle, children, dataLength = 0 }) {
@@ -155,7 +155,7 @@ function HistChartWrapper({ title, subtitle, children, dataLength = 0 }) {
   );
 }
 
-/* Temperature Chart */
+/* ── Temperature Chart ─────────────────────────────────────────────────── */
 
 /* Line chart: Mean, Max, Min temperature over a date range */
 export function TempHistChart({ data }) {
@@ -178,7 +178,7 @@ export function TempHistChart({ data }) {
   );
 }
 
-/* Sun Cycle Chart */
+/* ── Sun Cycle Chart ───────────────────────────────────────────────────── */
 
 /* Area chart: Sunrise and Sunset times in IST (decimal hours) */
 export function SunCycleChart({ data }) {
@@ -239,7 +239,7 @@ export function SunCycleChart({ data }) {
   );
 }
 
-/* Precipitation Chart */
+/* ── Precipitation Chart ───────────────────────────────────────────────── */
 
 /* Bar chart: total daily precipitation over the range */
 export function PrecipHistChart({ data }) {
@@ -259,7 +259,7 @@ export function PrecipHistChart({ data }) {
   );
 }
 
-/* Wind Chart */
+/* ── Wind Chart ────────────────────────────────────────────────────────── */
 
 /* Composed chart: bar for wind speed + line for dominant direction */
 export function WindHistChart({ data }) {
@@ -284,7 +284,7 @@ export function WindHistChart({ data }) {
   );
 }
 
-/* Air Quality Chart */
+/* ── Air Quality Chart ─────────────────────────────────────────────────── */
 
 /* Line chart: PM10 and PM2.5 daily trends */
 export function AQHistChart({ data }) {

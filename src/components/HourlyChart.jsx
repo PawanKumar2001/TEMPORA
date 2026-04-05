@@ -1,4 +1,5 @@
 import React, { useRef, useCallback } from "react";
+import { useTheme } from "../context/ThemeContext";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -35,44 +36,42 @@ function DarkTooltip({ active, payload, label }) {
   );
 }
 
-/* Brush component — drag handles to zoom into a time window.
-   Uses explicit colors instead of CSS vars since SVG attrs don't resolve them in production. */
+/* Brush component — reads accent directly from ThemeContext, works in production */
 function ChartBrush({ dataLength }) {
+  const { themeKey, themes } = useTheme();
   const startIndex = Math.max(0, dataLength - 12);
 
-  /* Read computed CSS variable values at render time so themes still work */
-  const style = typeof window !== "undefined"
-    ? getComputedStyle(document.documentElement)
-    : null;
-
-  const borderColor = style?.getPropertyValue("--border").trim() || "rgba(255,255,255,0.1)";
-  const bgColor     = style?.getPropertyValue("--bg2").trim()    || "#0d1526";
-  const accentColor = style?.getPropertyValue("--accent").trim() || "#22d3ee";
+  const vars = themes[themeKey]?.vars || {};
+  const accent = vars["--accent"] || "#22d3ee";
+  const bg2    = vars["--bg2"]    || "#0d1526";
+  const border = vars["--border"] || "rgba(255,255,255,0.1)";
 
   return (
     <Brush
-    dataKey="hour"
-    startIndex={startIndex}
-    height={24}
-    stroke={accentColor}
-    fill={bgColor}
-    travellerWidth={8}
-    traveller={<CustomTraveller fill={accentColor} />}
-  />
+      dataKey="hour"
+      startIndex={startIndex}
+      height={28}
+      stroke={accent}
+      fill={bg2}
+      travellerWidth={8}
+      traveller={<CustomTraveller fill={accent} stroke={border} />}
+    />
   );
 }
 
-/* Custom traveller handle rendered as a plain rect — avoids SVG CSS var issues */
-function CustomTraveller({ x, y, width, height, fill }) {
+/* Custom traveller handle */
+function CustomTraveller({ x, y, width, height, fill, stroke }) {
   return (
     <rect
       x={x}
       y={y}
       width={width || 8}
-      height={height || 24}
+      height={height || 28}
       rx={4}
       ry={4}
       fill={fill}
+      stroke={stroke}
+      strokeWidth={1}
       style={{ cursor: "ew-resize" }}
     />
   );
