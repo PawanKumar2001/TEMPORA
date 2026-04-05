@@ -13,6 +13,7 @@ import {
   Brush,
 } from "recharts";
 
+/* Custom tooltip styled to match the active theme */
 function DarkTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   return (
@@ -34,17 +35,45 @@ function DarkTooltip({ active, payload, label }) {
   );
 }
 
-/* Brush component */
+/* Brush component — drag handles to zoom into a time window.
+   Uses explicit colors instead of CSS vars since SVG attrs don't resolve them in production. */
 function ChartBrush({ dataLength }) {
   const startIndex = Math.max(0, dataLength - 12);
+
+  /* Read computed CSS variable values at render time so themes still work */
+  const style = typeof window !== "undefined"
+    ? getComputedStyle(document.documentElement)
+    : null;
+
+  const borderColor = style?.getPropertyValue("--border").trim() || "rgba(255,255,255,0.1)";
+  const bgColor     = style?.getPropertyValue("--bg2").trim()    || "#0d1526";
+  const accentColor = style?.getPropertyValue("--accent").trim() || "#22d3ee";
+
   return (
     <Brush
-      dataKey="hour"
-      startIndex={startIndex}
-      height={24}
-      stroke="var(--border)"
-      fill="var(--bg2)"
-      travellerWidth={8}
+    dataKey="hour"
+    startIndex={startIndex}
+    height={24}
+    stroke={accentColor}
+    fill={bgColor}
+    travellerWidth={8}
+    traveller={<CustomTraveller fill={accentColor} />}
+  />
+  );
+}
+
+/* Custom traveller handle rendered as a plain rect — avoids SVG CSS var issues */
+function CustomTraveller({ x, y, width, height, fill }) {
+  return (
+    <rect
+      x={x}
+      y={y}
+      width={width || 8}
+      height={height || 24}
+      rx={4}
+      ry={4}
+      fill={fill}
+      style={{ cursor: "ew-resize" }}
     />
   );
 }

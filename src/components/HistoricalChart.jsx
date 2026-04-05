@@ -51,22 +51,49 @@ function HistTooltip({ active, payload, label }) {
 
 /* ── Brush ─────────────────────────────────────────────────────────────── */
 
-/* Brush defaults to showing last 90 days; drag handles to zoom */
+/* Brush defaults to showing last 90 days; drag handles to zoom.
+   Reads CSS vars via getComputedStyle so SVG attrs resolve correctly in production. */
 function HistBrush({ dataLength }) {
   const startIndex = Math.max(0, dataLength - 90);
+
+  const style = typeof window !== "undefined"
+    ? getComputedStyle(document.documentElement)
+    : null;
+
+  const borderColor = style?.getPropertyValue("--border").trim() || "rgba(255,255,255,0.1)";
+  const bgColor     = style?.getPropertyValue("--bg2").trim()    || "#0d1526";
+  const accentColor = style?.getPropertyValue("--accent").trim() || "#22d3ee";
+
   return (
     <Brush
-      dataKey="date"
-      startIndex={startIndex}
-      height={22}
-      stroke="var(--border)"
-      fill="var(--bg2)"
-      travellerWidth={7}
+    dataKey="date"
+    startIndex={startIndex}
+    height={22}
+    stroke={accentColor}
+    fill={bgColor}
+    travellerWidth={7}
+    traveller={<HistTraveller fill={accentColor} />}
+  />
+  );
+}
+
+/* Custom traveller handle for HistBrush */
+function HistTraveller({ x, y, width, height, fill }) {
+  return (
+    <rect
+      x={x}
+      y={y}
+      width={width || 7}
+      height={height || 22}
+      rx={3}
+      ry={3}
+      fill={fill}
+      style={{ cursor: "ew-resize" }}
     />
   );
 }
 
-/* ── Chart Wrapper ─────────────────────────────────────────────────────── */
+/* Chart Wrapper */
 
 /* Horizontal-scroll + drag-to-scroll wrapper shared by all historical charts */
 function HistChartWrapper({ title, subtitle, children, dataLength = 0 }) {
@@ -128,7 +155,7 @@ function HistChartWrapper({ title, subtitle, children, dataLength = 0 }) {
   );
 }
 
-/*  Temperature Chart  */
+/* Temperature Chart */
 
 /* Line chart: Mean, Max, Min temperature over a date range */
 export function TempHistChart({ data }) {
@@ -202,6 +229,7 @@ export function SunCycleChart({ data }) {
             }}
           />
           <Legend wrapperStyle={{ fontSize: 11, color: "var(--muted)" }} />
+          {/* Filled area between sunrise and sunset represents daylight hours */}
           <Area type="monotone" dataKey="sunset"  stroke="var(--accent)"  strokeWidth={2} fill="url(#grad-daylight)" name="Sunset"  dot={false} />
           <Line type="monotone" dataKey="sunrise" stroke="var(--accent2)" strokeWidth={2} dot={false} name="Sunrise" />
           <HistBrush dataLength={data.length} />
@@ -211,7 +239,7 @@ export function SunCycleChart({ data }) {
   );
 }
 
-/*  Precipitation Chart  */
+/* Precipitation Chart */
 
 /* Bar chart: total daily precipitation over the range */
 export function PrecipHistChart({ data }) {
@@ -231,7 +259,7 @@ export function PrecipHistChart({ data }) {
   );
 }
 
-/*  Wind Chart  */
+/* Wind Chart */
 
 /* Composed chart: bar for wind speed + line for dominant direction */
 export function WindHistChart({ data }) {
@@ -256,7 +284,7 @@ export function WindHistChart({ data }) {
   );
 }
 
-/*  Air Quality Chart  */
+/* Air Quality Chart */
 
 /* Line chart: PM10 and PM2.5 daily trends */
 export function AQHistChart({ data }) {
